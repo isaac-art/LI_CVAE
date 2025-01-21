@@ -1,0 +1,47 @@
+i<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tiled Videos</title>
+    <style>
+        .video-container {
+            display: flex;
+            flex-wrap: wrap;
+        }
+        .video-container video {
+            width: 128px; /* Adjust as necessary to fit the desired layout */
+            margin: 0px;
+        }
+    </style>
+</head>
+<body>
+    <div class="video-container" id="videoContainer">
+        <!-- Videos will be dynamically added here -->
+    </div>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const videoContainer = document.getElementById('videoContainer');
+            const videoSrc = 'walk_6.mp4'; // Path to your MP4 file
+            const numVideos = 6;
+            const offsetStep = 2; // Offset in seconds
+
+            for (let i = 0; i < numVideos; i++) {
+                const video = document.createElement('video');
+                video.src = videoSrc;
+                video.controls = true; // Optional: Remove if you don't want video controls
+                video.autoplay = true;
+                video.loop = true;
+                video.muted = true; // Optional: Mute videos if desired
+
+                // Set the start time offset
+                video.addEventListener('loadedmetadata', function() {
+                    video.currentTime = (i * offsetStep) % video.duration;
+                });
+
+                videoContainer.appendChild(video);
+            }
+        });
+    </script>
+</body>
+</html>
