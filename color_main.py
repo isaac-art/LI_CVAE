@@ -1,5 +1,6 @@
 import argparse
 import torch
+import torch.nn as nn
 from pathlib import Path
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
@@ -8,6 +9,27 @@ from color_train import ColorImageDataset, train_color_vae
 from color_vis import (create_latent_space_grid, create_latent_walk_animation, 
                       generate_tileable_samples, interpolate_samples)
 
+def add_circular_padding_hooks(model):
+    def make_circular_conv_hook(module, input):
+        x = input[0]
+        if isinstance(module, (nn.Conv2d, nn.ConvTranspose2d)):
+            # Add circular padding before the convolution
+            pad_h = module.padding[0]
+            pad_w = module.padding[1]
+            if pad_h > 0 or pad_w > 0:
+                x = torch.cat([x[:, :, -pad_h:, :], x, x[:, :, :pad_h, :]], dim=2)
+                x = torch.cat([x[:, :, :, -pad_w:], x, x[:, :, :, :pad_w]], dim=3)
+            return (x,)
+        return input
+
+    # Register hooks for all convolution layers
+    hooks = []
+    for module in model.modules():
+        if isinstance(module, (nn.Conv2d, nn.ConvTranspose2d)):
+            hooks.append(module.register_forward_pre_hook(make_circular_conv_hook))
+    
+    return hooks
+
 def main():
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Train or load a Color VAE model')
@@ -15,11 +37,12 @@ def main():
     parser.add_argument('--image-size', type=int, default=128, help='Image size (square)')
     parser.add_argument('--latent-dim', type=int, default=32, help='Dimension of latent space')
     parser.add_argument('--batch-size', type=int, default=32, help='Batch size for training')
+    parser.add_argument('--circular-padding', action='store_true', help='Use circular padding for convolutions')
     args = parser.parse_args()
 
     # Setup paths
-    image_dir = Path("color_images")
-    model_path = Path(f"trained_color_vae_{args.image_size}.pth")
+    image_dir = Path("color/both")
+    model_path = Path(f"trained_color_vae_both_{args.image_size}.pth")
     
     # Check if image directory exists
     if not image_dir.exists():
@@ -42,8 +65,12 @@ def main():
         torch.save(vae.state_dict(), model_path)
         print(f"Saved trained model to {model_path}")
     
+
+    if args.circular_padding:
+        hooks = add_circular_padding_hooks(vae)
+    
     # Create output directories
-    output_dir = Path("color_outputs")
+    output_dir = Path("color_outputs_both")
     output_dir.mkdir(exist_ok=True)
     
     # Generate visualizations

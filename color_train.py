@@ -58,7 +58,7 @@ def train_color_vae(model: nn.Module,
     best_loss = float('inf')
     patience = 50
     patience_counter = 0
-    min_epochs = 100
+    min_epochs = 1000
     
     for epoch in range(num_epochs):
         model.train()

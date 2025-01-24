@@ -1,5 +1,6 @@
 import argparse
 import torch
+import torch.nn as nn
 from pathlib import Path
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
@@ -7,12 +8,34 @@ from vae_model import VAE
 from train import ImageDataset, train_vae
 from visualize import create_conditional_latent_space_grid, visualize_class_interpolation, visualize_class_samples, generate_and_save_class_samples, generate_and_save_class_walk, create_conditional_latent_space_anim
 
+def add_circular_padding_hooks(model):
+    def make_circular_conv_hook(module, input):
+        x = input[0]
+        if isinstance(module, (nn.Conv2d, nn.ConvTranspose2d)):
+            # Add circular padding before the convolution
+            pad_h = module.padding[0]
+            pad_w = module.padding[1]
+            if pad_h > 0 or pad_w > 0:
+                x = torch.cat([x[:, :, -pad_h:, :], x, x[:, :, :pad_h, :]], dim=2)
+                x = torch.cat([x[:, :, :, -pad_w:], x, x[:, :, :, :pad_w]], dim=3)
+            return (x,)
+        return input
+
+    # Register hooks for all convolution layers
+    hooks = []
+    for module in model.modules():
+        if isinstance(module, (nn.Conv2d, nn.ConvTranspose2d)):
+            hooks.append(module.register_forward_pre_hook(make_circular_conv_hook))
+    
+    return hooks
+
 def main():
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Train or load a VAE model')
     parser.add_argument('--load', action='store_true', help='Load pre-trained model instead of training')
     parser.add_argument('--image-size', type=int, default=128, help='Image size (square)')
     parser.add_argument('--temperature', type=float, default=0.1, help='Temperature for final sigmoid (lower = sharper)')
+    parser.add_argument('--circular-padding', action='store_true', help='Use circular padding for convolutions')
     args = parser.parse_args()
 
     image_dir = Path(f"images_{args.image_size}")
@@ -57,19 +80,27 @@ def main():
     
     # Load or train the model
     if args.load and model_path.exists():
+        print("Loading pre-trained model from ", model_path)
         vae.load_state_dict(torch.load(model_path))
         print("Loaded pre-trained model")
     else:
+        print("Training new model...")
         vae = train_vae(vae, dataloader)  # Update the same vae variable
         torch.save(vae.state_dict(), model_path)
         print(f"Saved trained model to {model_path}")
+
+    if args.circular_padding:
+        print("Adding circular padding hooks...")
+        hooks = add_circular_padding_hooks(vae)
     
     # Store class names for later use
     class_names_path = Path("class_names.txt")
     with open(class_names_path, "w") as f:
         for i, name in enumerate(class_names):
             f.write(f"{i}: {name}\n")
-    
+    print("Saved class names to 'class_names.txt'")
+
+    print("Creating latent space animation...")
     create_conditional_latent_space_anim(vae)
 
     # # After the existing visualizations, add:

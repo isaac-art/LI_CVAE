@@ -12,8 +12,8 @@ def create_latent_space_grid(model, num_points: int = 15, save_path: str = None)
     model = model.to(device)
     
     # Create a grid of points in latent space
-    x = np.linspace(-3, 3, num_points)
-    y = np.linspace(-3, 3, num_points)
+    x = np.linspace(-3, 3, num_points).astype(np.float32)
+    y = np.linspace(-3, 3, num_points).astype(np.float32)
     grid_x, grid_y = np.meshgrid(x, y)
     
     # Generate images for each point in the grid
@@ -22,9 +22,9 @@ def create_latent_space_grid(model, num_points: int = 15, save_path: str = None)
         row_images = []
         for j in range(num_points):
             # Create latent vector using first two dimensions
-            z = torch.zeros(1, model.latent_dim, device=device)
-            z[0, 0] = torch.tensor(grid_x[i, j], device=device)
-            z[0, 1] = torch.tensor(grid_y[i, j], device=device)
+            z = torch.zeros(1, model.latent_dim, device=device, dtype=torch.float32)
+            z[0, 0] = torch.tensor(grid_x[i, j], device=device, dtype=torch.float32)
+            z[0, 1] = torch.tensor(grid_y[i, j], device=device, dtype=torch.float32)
             
             with torch.no_grad():
                 generated = model.decode(z)

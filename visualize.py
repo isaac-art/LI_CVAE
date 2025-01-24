@@ -37,6 +37,7 @@ def create_conditional_latent_space_anim(model, num_points: int=150, num_frames:
             interpolated_label = (1 - alpha) * start_one_hot + alpha * end_one_hot
             
             for i, (xi, yi) in enumerate(zip(grid_x[0], grid_y[0])):
+                print(f"Generating frame {frame_count:04d}_{i:03d}")
                 z = torch.tensor([[xi, yi]], dtype=torch.float32).to(device)
                 
                 with torch.no_grad():

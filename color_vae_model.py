@@ -6,20 +6,6 @@ import numpy as np
 from PIL import Image
 from pathlib import Path
 
-class CircularPad2d(nn.Module):
-    """Circular padding for creating tileable outputs"""
-    def __init__(self, padding):
-        super().__init__()
-        self.padding = padding
-
-    def forward(self, x):
-        if isinstance(self.padding, int):
-            pad_left = pad_right = pad_top = pad_bottom = self.padding
-        else:
-            pad_left, pad_right, pad_top, pad_bottom = self.padding
-
-        return F.pad(x, (pad_left, pad_right, pad_top, pad_bottom), mode='circular')
-
 class Reshape(nn.Module):
     def __init__(self, *args):
         super().__init__()
@@ -56,8 +42,7 @@ class ColorVAE(nn.Module):
         for i in range(self.num_conv_layers):
             out_channels = min(512, 64 * (2 ** i))
             encoder_layers.extend([
-                CircularPad2d(1),
-                nn.Conv2d(current_channels, out_channels, 4, stride=2, padding=0),
+                nn.Conv2d(current_channels, out_channels, 4, stride=2, padding=1),
                 nn.BatchNorm2d(out_channels),
                 nn.LeakyReLU(0.2, inplace=True)
             ])
@@ -84,16 +69,13 @@ class ColorVAE(nn.Module):
             if i == self.num_conv_layers - 1:  # Last layer
                 out_channels = 3  # RGB output
                 decoder_layers.extend([
-                    CircularPad2d(1),
-                    nn.ConvTranspose2d(in_channels, out_channels, 4, stride=2, padding=0),
-                    CircularPad2d(1),
-                    nn.Conv2d(out_channels, out_channels, 3, padding=0),
+                    nn.ConvTranspose2d(in_channels, out_channels, 4, stride=2, padding=1),
+                    nn.Conv2d(out_channels, out_channels, 3, padding=1),
                     nn.Sigmoid()  # Regular sigmoid for color values
                 ])
             else:
                 decoder_layers.extend([
-                    CircularPad2d(1),
-                    nn.ConvTranspose2d(in_channels, out_channels, 4, stride=2, padding=0),
+                    nn.ConvTranspose2d(in_channels, out_channels, 4, stride=2, padding=1),
                     nn.BatchNorm2d(out_channels),
                     nn.LeakyReLU(0.2, inplace=True)
                 ])

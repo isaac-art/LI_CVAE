@@ -101,9 +101,17 @@ class VAE(nn.Module):
         print(f"Temperature: {temperature}")
     
     def _one_hot_encode(self, label):
-        # Ensure labels are in range [0, num_classes-1]
-        label = label.clamp(0, self.num_classes - 1)
-        one_hot = torch.zeros(label.size(0), self.num_classes).to(label.device)
+        # Ensure label is a long tensor and has correct shape
+        label = label.long()
+        if label.dim() == 1:
+            batch_size = label.size(0)
+        else:
+            # If single value, add batch dimension
+            label = label.view(-1)
+            batch_size = label.size(0)
+        
+        # Create one-hot tensor on same device as label
+        one_hot = torch.zeros(batch_size, self.num_classes, device=label.device)
         one_hot.scatter_(1, label.unsqueeze(1), 1)
         return one_hot
     
@@ -126,10 +134,27 @@ class VAE(nn.Module):
         return mu + eps * std
     
     def decode(self, z: torch.Tensor, label: torch.Tensor, apply_threshold: bool = False) -> torch.Tensor:
-        # Concatenate latent vector with label
-        one_hot = self._one_hot_encode(label)
-        z = torch.cat([z, one_hot], dim=1)
+        # Ensure label is a tensor and has correct shape
+        if not isinstance(label, torch.Tensor):
+            label = torch.tensor(label, device=z.device)
         
+        # Match batch size of z
+        if label.dim() == 0:
+            label = label.expand(z.size(0))
+        elif label.dim() == 1 and label.size(0) != z.size(0):
+            # If label is 1D but wrong size, expand or slice as needed
+            if label.size(0) == 1:
+                label = label.expand(z.size(0))
+            else:
+                label = label[:z.size(0)]  # Take first z.size(0) elements
+        
+        one_hot = self._one_hot_encode(label)
+        
+        # Ensure one_hot has correct batch size
+        if one_hot.size(0) != z.size(0):
+            one_hot = one_hot[:z.size(0)]
+        
+        z = torch.cat([z, one_hot], dim=1)
         x = self.decoder_input(z)
         
         # Calculate the initial size based on the number of conv layers
